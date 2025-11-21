@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Editor - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 Markdown Editor</h1>
+            <p class="subtitle">Tvé markdown soubory</p>
+        </header>
+
+        <div class="controls">
+            <input type="text" id="searchInput" placeholder="🔍 Vyhledat soubor..." class="search-input">
+            
+            <div class="sort-controls">
+                <label for="sortBy">Řadit podle:</label>
+                <select id="sortBy" class="sort-select">
+                    <option value="date-desc">Datum (nejnovější)</option>
+                    <option value="date-asc">Datum (nejstarší)</option>
+                    <option value="name-asc">Název (A-Z)</option>
+                    <option value="name-desc">Název (Z-A)</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="filesContainer" class="files-container">
+            <div class="loading">Načítám soubory...</div>
+        </div>
+    </div>
+
+    <script>
+        let allFiles = [];
+
+        // Načtení souborů při načtení stránky
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const data = await response.json();
+                allFiles = data.files;
+                renderFiles(allFiles);
+            } catch (error) {
+                document.getElementById('filesContainer').innerHTML = 
+                    '<div class="error">❌ Chyba při načítání souborů</div>';
+            }
+        }
+
+        // Vykreslení seznamu souborů
+        function renderFiles(files) {
+            const container = document.getElementById('filesContainer');
+            
+            if (files.length === 0) {
+                container.innerHTML = '<div class="empty">Žádné markdown soubory nenalezeny.<br>Nahraj .md soubory do složky <code>markdown-files/</code></div>';
+                return;
+            }
+
+            container.innerHTML = files.map(file => `
+                <div class="file-card" onclick="openFile('${file.name}')">
+                    <div class="file-icon">📄</div>
+                    <div class="file-info">
+                        <h3 class="file-name">${file.name}</h3>
+                        <div class="file-meta">
+                            <span class="file-date">📅 ${file.modified}</span>
+                            <span class="file-size">${formatFileSize(file.size)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Formátování velikosti souboru
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Otevření souboru v editoru
+        function openFile(filename) {
+            window.location.href = `/editor/${filename}`;
+        }
+
+        // Vyhledávání
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filtered = allFiles.filter(file => 
+                file.name.toLowerCase().includes(searchTerm)
+            );
+            renderFiles(filtered);
+        });
+
+        // Třídění
+        document.getElementById('sortBy').addEventListener('change', (e) => {
+            const sortBy = e.target.value;
+            let sorted = [...allFiles];
+
+            switch(sortBy) {
+                case 'date-desc':
+                    sorted.sort((a, b) => b.modified_timestamp - a.modified_timestamp);
+                    break;
+                case 'date-asc':
+                    sorted.sort((a, b) => a.modified_timestamp - b.modified_timestamp);
+                    break;
+                case 'name-asc':
+                    sorted.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+                    break;
+                case 'name-desc':
+                    sorted.sort((a, b) => b.name.localeCompare(a.name, 'cs'));
+                    break;
+            }
+
+            allFiles = sorted;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allFiles.filter(file => 
+                file.name.toLowerCase().includes(searchTerm)
+            );
+            renderFiles(filtered);
+        });
+
+        // Načtení souborů při načtení stránky
+        loadFiles();
+    </script>
+</body>
+</html>
