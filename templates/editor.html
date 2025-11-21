@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor - {{ filename }}</title>
+    <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="editor-page">
+    <div class="editor-container">
+        <header class="editor-header">
+            <div class="header-left">
+                <a href="/" class="back-button">← Dashboard</a>
+                <h1 class="file-title">{{ filename }}</h1>
+            </div>
+            <div class="save-indicator" id="saveIndicator">
+                <span class="saved">✓ Uloženo</span>
+            </div>
+        </header>
+
+        <div id="editor"></div>
+    </div>
+
+    <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+    <script>
+        const filename = "{{ filename }}";
+        let editor;
+        let saveTimeout;
+        let isLoading = true;
+
+        // Inicializace editoru
+        async function initEditor() {
+            try {
+                // Načtení obsahu souboru
+                const response = await fetch(`/api/file/${filename}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Chyba: ' + data.error);
+                    return;
+                }
+
+                // Vytvoření Toast UI editoru
+                editor = new toastui.Editor({
+                    el: document.querySelector('#editor'),
+                    height: 'calc(100vh - 80px)',
+                    initialEditType: 'wysiwyg',
+                    previewStyle: 'vertical',
+                    initialValue: data.content,
+                    usageStatistics: false,
+                    toolbarItems: [
+                        ['heading', 'bold', 'italic', 'strike'],
+                        ['hr', 'quote'],
+                        ['ul', 'ol', 'task'],
+                        ['table', 'link', 'image'],
+                        ['code', 'codeblock']
+                    ],
+                    hooks: {
+                        addImageBlobHook: async (blob, callback) => {
+                            // Nahrání obrázku na server
+                            const formData = new FormData();
+                            formData.append('image', blob);
+
+                            try {
+                                const response = await fetch('/api/upload-image', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+
+                                const data = await response.json();
+
+                                if (data.success) {
+                                    // Vrátíme URL s relativní cestou
+                                    const imageUrl = `/markdown-files/${data.path}`;
+                                    callback(imageUrl, data.filename);
+                                } else {
+                                    alert('Chyba při nahrávání obrázku: ' + data.error);
+                                }
+                            } catch (error) {
+                                alert('Chyba při nahrávání obrázku');
+                            }
+                        }
+                    }
+                });
+
+                // Auto-save při změně
+                editor.on('change', () => {
+                    if (isLoading) {
+                        isLoading = false;
+                        return;
+                    }
+                    scheduleAutoSave();
+                });
+
+                console.log('✓ Editor načten');
+            } catch (error) {
+                alert('Chyba při načítání souboru: ' + error.message);
+            }
+        }
+
+        // Naplánování auto-save
+        function scheduleAutoSave() {
+            // Zobrazíme indikátor ukládání
+            const indicator = document.getElementById('saveIndicator');
+            indicator.innerHTML = '<span class="saving">⏳ Ukládám...</span>';
+
+            // Zrušíme předchozí timeout
+            clearTimeout(saveTimeout);
+
+            // Naplánujeme uložení za 3 sekundy
+            saveTimeout = setTimeout(async () => {
+                await saveFile();
+            }, 3000);
+        }
+
+        // Uložení souboru
+        async function saveFile() {
+            try {
+                const content = editor.getMarkdown();
+
+                const response = await fetch(`/api/file/${filename}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await response.json();
+
+                const indicator = document.getElementById('saveIndicator');
+                if (data.success) {
+                    indicator.innerHTML = '<span class="saved">✓ Uloženo</span>';
+                } else {
+                    indicator.innerHTML = '<span class="error">❌ Chyba při ukládání</span>';
+                }
+            } catch (error) {
+                const indicator = document.getElementById('saveIndicator');
+                indicator.innerHTML = '<span class="error">❌ Chyba při ukládání</span>';
+            }
+        }
+
+        // Uložení před zavřením stránky
+        window.addEventListener('beforeunload', (e) => {
+            if (saveTimeout) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Inicializace při načtení stránky
+        initEditor();
+    </script>
+</body>
+</html>
+
