@@ -130,13 +130,9 @@ pip3 install -r requirements.txt --force-reinstall
 - Zkontroluj cestu v markdownu: `![alt](images/obrazek.png)`
 - Podporované formáty: PNG, JPG, JPEG, GIF, WEBP, SVG
 
-### Port 5000 je obsazený (macOS problém)
-Na novějších verzích macOS je port 5000 často obsazený systémovou službou ControlCenter.
-**Řešení:** Aplikace proto používá port **8000** místo 5000.
-
 ## 📄 Licence
 
-Tento projekt je open source a volně k dispozici pro osobní i komerční použití.
+Tento projekt je k dispozici pod [MIT licencí](LICENSE). Můžete ho volně používat, upravovat a sdílet pro osobní i komerční účely.
 
 ---
 
